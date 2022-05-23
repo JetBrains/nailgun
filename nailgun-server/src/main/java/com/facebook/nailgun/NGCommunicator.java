@@ -26,7 +26,6 @@ import java.io.InputStream;
 import java.io.PrintStream;
 import java.net.Socket;
 import java.net.SocketException;
-import java.net.SocketTimeoutException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -34,11 +33,8 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -51,8 +47,6 @@ import java.util.logging.Logger;
 public class NGCommunicator implements Closeable {
 
   private static final Logger LOG = Logger.getLogger(NGCommunicator.class.getName());
-  private final ExecutorService orchestratorExecutor;
-  private final ExecutorService readExecutor;
   private final Socket socket;
   private final DataInputStream in;
   private final DataOutputStream out;
@@ -67,7 +61,7 @@ public class NGCommunicator implements Closeable {
   private boolean outClosed = false;
   private boolean isExited = false;
   private int remaining = 0;
-  private AtomicBoolean clientConnected = new AtomicBoolean(true);
+  private final AtomicBoolean clientConnected = new AtomicBoolean(true);
   private final Set<NGClientListener> clientListeners = new HashSet<>();
   private final Set<NGHeartbeatListener> heartbeatListeners = new HashSet<>();
   private static final long TERMINATION_TIMEOUT_MS = 1000;
@@ -115,14 +109,6 @@ public class NGCommunicator implements Closeable {
         return t;
       }
     }
-
-    Thread mainThread = Thread.currentThread();
-    this.orchestratorExecutor =
-        Executors.newSingleThreadExecutor(
-            new NamedThreadFactory(mainThread.getName() + " (NGCommunicator orchestrator)"));
-    this.readExecutor =
-        Executors.newSingleThreadExecutor(
-            new NamedThreadFactory(mainThread.getName() + " (NGCommunicator reader)"));
   }
 
   /** Get nail command context from the header and start reading for stdin and heartbeats */
@@ -169,100 +155,7 @@ public class NGCommunicator implements Closeable {
       }
     }
 
-    // Command and environment is read. Move other communication with client, which is heartbeats
-    // and
-    // stdin, to background thread
-    startBackgroundReceive();
-
     return new CommandContext(command, cwd, remoteEnv, remoteArgs);
-  }
-
-  /**
-   * Call this to move all reads, like heartbeats and stdin, to be performed by background thread.
-   * This method should only be called once, as header data is read from the input stream.
-   */
-  private void startBackgroundReceive() {
-    // Read timeout, including heartbeats, should be handled by socket.
-    // However Java Socket/Stream API does not enforce that. To stay on safer side,
-    // use timeout on a future
-
-    // let socket timeout first, set rough timeout to 110% of original
-    long futureTimeout = heartbeatTimeoutMillis + heartbeatTimeoutMillis / 10;
-
-    orchestratorExecutor.submit(
-        () -> {
-          NGClientDisconnectReason reason = NGClientDisconnectReason.INTERNAL_ERROR;
-          try {
-            LOG.log(Level.FINE, "Orchestrator thread started");
-            while (true) {
-              Future<Byte> readFuture;
-              synchronized (orchestratorEvent) {
-                if (shutdown) {
-                  break;
-                }
-                readFuture =
-                    readExecutor.submit(
-                        () -> {
-                          try {
-                            return readChunk();
-                          } catch (IOException e) {
-                            throw new ExecutionException(e);
-                          }
-                        });
-              }
-
-              byte chunkType =
-                  futureTimeout > 0
-                      ? readFuture.get(futureTimeout, TimeUnit.MILLISECONDS)
-                      : readFuture.get();
-
-              if (chunkType == NGConstants.CHUNKTYPE_HEARTBEAT) {
-                notifyHeartbeat();
-              }
-            }
-          } catch (InterruptedException e) {
-            LOG.log(Level.WARNING, "NGCommunicator orchestrator was interrupted", e);
-          } catch (ExecutionException e) {
-            Throwable cause = getCause(e);
-            if (cause instanceof EOFException) {
-              // DataInputStream throws EOFException if stream is terminated
-              // just do nothing and exit main orchestrator thread loop
-              LOG.log(Level.FINE, "Socket is disconnected");
-              reason = NGClientDisconnectReason.SOCKET_ERROR;
-            } else if (cause instanceof SocketTimeoutException) {
-              reason = NGClientDisconnectReason.SOCKET_TIMEOUT;
-              LOG.log(
-                  Level.WARNING,
-                  "Nailgun client socket timed out after " + heartbeatTimeoutMillis + " ms",
-                  cause);
-            } else {
-              LOG.log(Level.WARNING, "Nailgun client read future raised an exception", cause);
-            }
-          } catch (TimeoutException e) {
-            reason = NGClientDisconnectReason.HEARTBEAT;
-            LOG.log(
-                Level.WARNING,
-                "Nailgun client read future timed out after " + futureTimeout + " ms",
-                e);
-          } catch (Throwable e) {
-            LOG.log(Level.WARNING, "Nailgun orchestrator gets an exception ", e);
-          }
-
-          LOG.log(Level.FINE, "Nailgun client disconnected");
-
-          // set client disconnected flag
-          clientConnected.set(false);
-
-          // notify stream readers there will be no more data
-          setEof();
-
-          // keep orchestrator thread running until signalled to shut up from close()
-          // it is still responsible to notify about client disconnects if listener is
-          // attached after disconnect had really happened
-          waitTerminationAndNotifyClients(reason);
-
-          LOG.log(Level.FINE, "Orchestrator thread finished");
-        });
   }
 
   private void waitTerminationAndNotifyClients(NGClientDisconnectReason reason) {
@@ -407,9 +300,6 @@ public class NGCommunicator implements Closeable {
     // but because it is idempotent, let's be good citizens and close corresponding streams as well
     in.close();
     out.close();
-
-    terminateExecutor(readExecutor, "read");
-    terminateExecutor(orchestratorExecutor, "orchestrator");
 
     socket.close();
   }
