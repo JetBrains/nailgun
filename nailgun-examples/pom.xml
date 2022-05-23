@@ -16,7 +16,7 @@
         
         This project contains the EXAMPLE CODE ONLY.
     </description>
-    <url>http://github.com/facebook/nailgun</url>
+    <url>http://github.com/JetBrains/nailgun</url>
   
     <parent>
         <groupId>com.facebook</groupId>

@@ -30,7 +30,7 @@
 
     This project contains the server and examples.
   </description>
-  <url>http://github.com/facebook/nailgun</url>
+  <url>http://github.com/JetBrains/nailgun</url>
 
   <licenses>
     <license>
@@ -41,16 +41,20 @@
   </licenses>
 
   <scm>
-    <url>scm:git:git@github.com:facebook/nailgun.git</url>
-    <connection>scm:git:git@github.com:facebook/nailgun.git</connection>
-    <developerConnection>scm:git:git@github.com:facebook/nailgun.git</developerConnection>
-    <tag>nailgun-all-1.0.1</tag>
+    <url>scm:git:git@github.com:JetBrains/nailgun.git</url>
+    <connection>scm:git:git@github.com:JetBrains/nailgun.git</connection>
+    <developerConnection>scm:git:git@github.com:JetBrains/nailgun.git</developerConnection>
+    <tag>nailgun-all-${project.version}</tag>
   </scm>
 
   <developers>
     <developer>
       <name>Facebook</name>
-      <url>http://github.com/facebook/nailgun</url>
+      <url>https://github.com/facebook</url>
+    </developer>
+    <developer>
+      <name>JetBrains</name>
+      <url>https://github.com/JetBrains</url>
     </developer>
   </developers>
 
