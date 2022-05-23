@@ -1,7 +1,9 @@
 nailgun
 =======
 
-[![Build status](https://circleci.com/gh/facebook/nailgun.svg?style=svg)](https://circleci.com/gh/facebook/nailgun)
+This repository is a fork of the original Nailgun project, used as a dependency for the Compile Server subsystem in
+the [IntelliJ Scala Plugin](https://github.com/JetBrains/intellij-scala). It features code changes that are uniquely
+tailored to the needs of the Scala plugin.
 
 ---
 
