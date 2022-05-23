@@ -26,6 +26,7 @@ import java.io.InputStream;
 import java.io.PrintStream;
 import java.net.Socket;
 import java.net.SocketException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -125,7 +126,7 @@ public class NGCommunicator implements Closeable {
 
       byte[] b = new byte[bytesToRead];
       in.readFully(b);
-      String line = new String(b, "UTF-8");
+      String line = new String(b, StandardCharsets.UTF_8);
 
       switch (chunkType) {
         case NGConstants.CHUNKTYPE_ARGUMENT:
