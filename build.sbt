@@ -1,6 +1,6 @@
-ThisBuild / organization := "org.jetbrains"
+import xerial.sbt.Sonatype.GitHubHosting
 
-ThisBuild / version := "1.0.2"
+ThisBuild / organization := "org.jetbrains"
 
 ThisBuild / description :=
   """Nailgun is a client, protocol and server for running Java programs
@@ -14,9 +14,7 @@ ThisBuild / description :=
 
 ThisBuild / homepage := Some(url("https://github.com/JetBrains/nailgun"))
 
-ThisBuild / licenses := Seq("Apache-2.0" -> new URL("https://www.apache.org/licenses/LICENSE-2.0.txt"))
-
-ThisBuild / publishMavenStyle := true
+ThisBuild / licenses := Seq("Apache-2.0" -> new URL("https://www.apache.org/licenses/LICENSE-2.0"))
 
 ThisBuild / crossPaths := false
 
@@ -26,6 +24,8 @@ ThisBuild / developers := List(
   Developer("facebook", "Facebook", "", url("https://github.com/facebook")),
   Developer("jetbrains", "JetBrains", "", url("https://github.com/JetBrains"))
 )
+
+ThisBuild / sonatypeProjectHosting := Some(GitHubHosting("JetBrains", "nailgun", "scala-developers@jetbrains.com"))
 
 ThisBuild / resolvers += Resolver.jcenterRepo
 
