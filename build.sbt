@@ -25,6 +25,14 @@ ThisBuild / developers := List(
   Developer("jetbrains", "JetBrains", "", url("https://github.com/JetBrains"))
 )
 
+ThisBuild / scmInfo := Some(
+  ScmInfo(
+    url("https://github.com/JetBrains/nailgun"),
+    "git@github.com:JetBrains/nailgun.git",
+    "git@github.com:JetBrains/nailgun.git"
+  )
+)
+
 ThisBuild / sonatypeProjectHosting := Some(GitHubHosting("JetBrains", "nailgun", "scala-developers@jetbrains.com"))
 
 ThisBuild / resolvers += Resolver.jcenterRepo
