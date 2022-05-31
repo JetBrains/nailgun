@@ -4,12 +4,12 @@ ThisBuild / organization := "org.jetbrains"
 
 ThisBuild / description :=
   """Nailgun is a client, protocol and server for running Java programs
-    |    from the command line without incurring the JVM startup overhead.
-    |    Programs run in the server (which is implemented in Java), and are
-    |    triggered by the client (C and Python clients available), which
-    |    handles all I/O.
+    |from the command line without incurring the JVM startup overhead.
+    |Programs run in the server (which is implemented in Java), and are
+    |triggered by the client (C and Python clients available), which
+    |handles all I/O.
     |
-    |    This project contains the server and examples.
+    |This project contains the server and examples.
     |""".stripMargin.trim
 
 ThisBuild / homepage := Some(url("https://github.com/JetBrains/nailgun"))
