@@ -52,15 +52,6 @@ class NGSessionPoolTest {
   }
 
   @Test
-  void reuseSessionPool() {
-    NGSessionPool pool = new NGSessionPool(server, 1);
-    NGSession session1 = pool.take();
-    pool.give(session1);
-    NGSession session2 = pool.take();
-    assertEquals(session1, session2);
-  }
-
-  @Test
   void emptySessionPoolAlwaysCreateNewSession() {
     NGSessionPool pool = new NGSessionPool(server, 0);
     NGSession session1 = pool.take();
@@ -79,7 +70,7 @@ class NGSessionPoolTest {
     pool.shutdown();
 
     // check that shutdown is called on session
-    verify(sessionMock, times(1)).shutdown();
+    verify(sessionMock, times(1 + 2)).shutdown();
 
     // this should not fail
     pool.give(session);

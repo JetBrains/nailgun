@@ -17,70 +17,67 @@
 
 package com.facebook.nailgun;
 
-import java.util.HashSet;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Queue;
-import java.util.Set;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
- * Provides NGSession pooling functionality. One parameter, "maxIdle", governs its behavior by
+ * Provides NGSession pooling functionality. One parameter, {@code threadCount}, governs its behavior by
  * setting the maximum number of idle NGSession threads it will allow. It creates a pool of size
- * maxIdle - 1, because one NGSession is kept "on deck" by the NGServer in order to eke out a little
- * extra responsiveness.
+ * {@code threadCount + 2}, because the Scala plugin sends metrics commands which we would like to
+ * complete as soon as possible, without waiting for some compilation unit to end. The IntelliJ IDEA JPS process
+ * will limit the number of requests to {@code threadCount} so that we have some threads leftover for metrics.
  *
  * @author <a href="http://www.martiansoftware.com/contact.html">Marty Lamb</a>
  */
 class NGSessionPool {
 
-  final Queue<NGSession> idlePool;
-  final Set<NGSession> workingPool;
+  final NGSession[] sessions;
 
-  final int maxIdleSessions;
+  final ArrayBlockingQueue<NGSession> idleSessions;
 
   /** reference to server we're working for */
   final NGServer server;
 
-  /** factory to create new NGSession instances */
-  final Supplier<NGSession> instanceCreator;
-
   /** have we been shut down? */
-  boolean done = false;
-
-  /** synchronization object */
-  private final Object lock = new Object();
+  AtomicBoolean done = new AtomicBoolean(false);
 
   /**
-   * Creates a new NGSessionRunner operating for the specified server, with the specified number of
+   * Creates a new NGSessionPool operating for the specified server, with the specified number of
    * threads
    *
    * @param server the server to work for
-   * @param maxIdleSessions the maximum number of idle threads to allow
+   * @param threadCount the number of threads in the pool
    */
-  NGSessionPool(NGServer server, int maxIdleSessions) {
-    this(server, maxIdleSessions, null);
+  NGSessionPool(NGServer server, int threadCount) {
+    this(server, threadCount, null);
   }
 
   /**
-   * Creates a new NGSessionRunner operating for the specified server, with the specified number of
+   * Creates a new NGSessionPool operating for the specified server, with the specified number of
    * threads
    *
    * @param server the server to work for
-   * @param maxIdleSessions the maximum number of idle threads to allow
+   * @param threadCount the number of threads in the pool
    * @param instanceCreator the factory method to create new NGSession instances, can be overridden
    *     for testing
    */
-  NGSessionPool(NGServer server, int maxIdleSessions, Supplier<NGSession> instanceCreator) {
+  NGSessionPool(NGServer server, int threadCount, Supplier<NGSession> instanceCreator) {
     this.server = server;
-    this.maxIdleSessions = Math.max(0, maxIdleSessions);
-    idlePool = new LinkedList<>();
-    workingPool = new HashSet<>();
-    this.instanceCreator =
-        instanceCreator != null ? instanceCreator : (() -> new NGSession(this, server));
+    final int numSessions = Math.max(2, threadCount + 2);
+    final Supplier<NGSession> creator =
+            instanceCreator != null ? instanceCreator : (() -> new NGSession(this, server));
+    sessions = new NGSession[numSessions];
+    idleSessions = new ArrayBlockingQueue<>(numSessions);
+    for (int i = 0; i < numSessions; i++) {
+      final NGSession session = creator.get();
+      sessions[i] = session;
+      idleSessions.offer(session);
+    }
+    for (NGSession session : sessions) {
+      session.start();
+    }
   }
 
   /**
@@ -89,60 +86,39 @@ class NGSessionPool {
    * @return an NGSession ready to work
    */
   NGSession take() {
-    synchronized (lock) {
-      if (done) {
-        throw new UnsupportedOperationException("NGSession pool is shutting down");
-      }
-      NGSession session = idlePool.poll();
-      if (session == null) {
-        session = instanceCreator.get();
-        session.start();
-      }
-      workingPool.add(session);
-      return session;
+    if (done.get()) {
+      throw new UnsupportedOperationException("NGSession pool is shutting down");
+    }
+    try {
+      return idleSessions.take();
+    } catch (InterruptedException e) {
+      throw new RuntimeException(e);
     }
   }
 
   /**
-   * Returns an NGSession to the pool. The pool may choose to shutdown the thread if idle pool is
-   * full.
+   * Returns an NGSession to the pool.
    *
    * @param session the NGSession to return to the pool
    */
   void give(NGSession session) {
-    synchronized (lock) {
-      if (done) {
-        // session is already signalled shutdown and removed from all collections
-        return;
-      }
-      workingPool.remove(session);
-
-      if (idlePool.size() < maxIdleSessions) {
-        idlePool.add(session);
-        return;
-      }
-    }
-    session.shutdown();
+    idleSessions.offer(session);
   }
 
   /** Shuts down the pool. The function waits for running nails to finish. */
   void shutdown() throws InterruptedException {
-    List<NGSession> allSessions;
-    synchronized (lock) {
-      done = true;
-      allSessions =
-          Stream.concat(workingPool.stream(), idlePool.stream()).collect(Collectors.toList());
-      idlePool.clear();
-      workingPool.clear();
+    if (!done.compareAndSet(false, true)) {
+      return;
     }
-    for (NGSession session : allSessions) {
+    idleSessions.clear();
+    for (NGSession session : sessions) {
       session.shutdown();
     }
 
     // wait for all sessions to complete by either returning from waiting state or finishing their
     // nails
     long start = System.nanoTime();
-    for (NGSession session : allSessions) {
+    for (NGSession session : sessions) {
       long timeout =
           NGConstants.SESSION_TERMINATION_TIMEOUT_MILLIS
               - TimeUnit.MILLISECONDS.convert(System.nanoTime() - start, TimeUnit.NANOSECONDS);
