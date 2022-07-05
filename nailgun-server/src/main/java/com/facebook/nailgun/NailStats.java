@@ -24,7 +24,7 @@ package com.facebook.nailgun;
  */
 public class NailStats implements Cloneable {
 
-  private final String nailclass;
+  private final Class<?> nailClass;
   private long runCounter;
   private long refCounter;
   private final Object lock;
@@ -32,10 +32,10 @@ public class NailStats implements Cloneable {
   /**
    * Creates a new NailStats object for the specified class
    *
-   * @param nailclass the class for which we'll collect statistics
+   * @param nailClass the class for which we'll collect statistics
    */
-  NailStats(String nailclass) {
-    this.nailclass = nailclass;
+  NailStats(Class<?> nailClass) {
+    this.nailClass = nailClass;
     runCounter = 0;
     refCounter = 0;
     lock = new Object();
@@ -84,13 +84,13 @@ public class NailStats implements Cloneable {
    *
    * @return the class for which we're tracking statistics
    */
-  public String getNailClass() {
-    return nailclass;
+  public Class<?> getNailClass() {
+    return nailClass;
   }
 
   /** @see java.lang.Object#hashCode */
   public int hashCode() {
-    return (nailclass.hashCode());
+    return nailClass.hashCode();
   }
 
   /**
@@ -105,7 +105,7 @@ public class NailStats implements Cloneable {
     }
 
     NailStats other = (NailStats) o;
-    return (nailclass.equals(other.nailclass));
+    return nailClass.equals(other.nailClass);
   }
 
   /**
@@ -117,7 +117,7 @@ public class NailStats implements Cloneable {
     Object result = null;
     try {
       result = super.clone();
-    } catch (CloneNotSupportedException toDiscard) {
+    } catch (CloneNotSupportedException ignored) {
     }
     return (result);
   }
@@ -127,6 +127,6 @@ public class NailStats implements Cloneable {
    * runcount/refcount". *return a String representation of this <code>NailStats</code> object.
    */
   public String toString() {
-    return (nailclass + ": " + getRunCount() + "/" + getRefCount());
+    return nailClass + ": " + getRunCount() + "/" + getRefCount();
   }
 }

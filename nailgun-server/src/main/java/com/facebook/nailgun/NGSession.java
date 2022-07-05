@@ -126,7 +126,6 @@ public class NGSession extends Thread {
       nextSocket = null;
       lock.notifyAll();
     }
-    interrupt();
   }
 
   /**

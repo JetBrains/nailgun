@@ -22,13 +22,14 @@ import com.sun.jna.Platform;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
+import java.lang.reflect.Method;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.UnknownHostException;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.TreeMap;
+import java.util.Set;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
@@ -83,7 +84,7 @@ public class NGServer implements Runnable {
   public final InputStream in = System.in;
 
   /** a collection of all classes executed by this server so far */
-  private final Map<String, NailStats> allNailStats;
+  private final Map<Class<?>, NailStats> allNailStats;
 
   /** Remember the security manager we start with so we can restore it later */
   private SecurityManager originalSecurityManager = null;
@@ -202,14 +203,13 @@ public class NGServer implements Runnable {
    * @param nailClass the class for which we're gathering stats
    * @return a NailStats object for the specified class
    */
-  private NailStats getOrCreateStatsFor(Class nailClass) {
+  private NailStats getOrCreateStatsFor(Class<?> nailClass) {
     NailStats result;
     synchronized (allNailStats) {
-      String nailClassName = nailClass.getName();
-      result = allNailStats.get(nailClassName);
+      result = allNailStats.get(nailClass);
       if (result == null) {
-        result = new NailStats(nailClassName);
-        allNailStats.put(nailClassName, result);
+        result = new NailStats(nailClass);
+        allNailStats.put(nailClass, result);
       }
     }
     return result;
@@ -242,10 +242,10 @@ public class NGServer implements Runnable {
    *
    * @return a snapshot of this NGServer's nail statistics.
    */
-  public Map<String, NailStats> getNailStats() {
-    Map<String, NailStats> result = new TreeMap();
+  public Map<Class<?>, NailStats> getNailStats() {
+    Map<Class<?>, NailStats> result = new HashMap<>();
     synchronized (allNailStats) {
-      for (Map.Entry<String, NailStats> entry : allNailStats.entrySet()) {
+      for (Map.Entry<Class<?>, NailStats> entry : allNailStats.entrySet()) {
         result.put(entry.getKey(), (NailStats) entry.getValue().clone());
       }
     }
@@ -402,6 +402,23 @@ public class NGServer implements Runnable {
     } catch (Throwable ex) {
       // we are going to die anyways so let's just continue
       LOG.log(Level.WARNING, "Exception shutting down Nailgun server", ex);
+    }
+
+    for (final Alias alias : ((Set<Alias>) getAliasManager().getAliases())) {
+      getOrCreateStatsFor(alias.getAliasedClass());
+    }
+
+    final Class<?>[] argTypes = new Class[] { NGServer.class };
+    final Object[] argValues = new Object[] { this };
+
+    synchronized (allNailStats) {
+      for (final NailStats ns : allNailStats.values()) {
+        try {
+          final Method nailShutdown = ns.getNailClass().getMethod("nailShutdown", argTypes);
+          nailShutdown.invoke(null, argValues);
+        } catch (Throwable ignored) {
+        }
+      }
     }
 
     // restore system streams
