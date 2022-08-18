@@ -28,8 +28,8 @@ ThisBuild / developers := List(
 ThisBuild / scmInfo := Some(
   ScmInfo(
     url("https://github.com/JetBrains/nailgun"),
-    "git@github.com:JetBrains/nailgun.git",
-    "git@github.com:JetBrains/nailgun.git"
+    "scm:git:git@github.com:JetBrains/nailgun.git",
+    "scm:git:git@github.com:JetBrains/nailgun.git"
   )
 )
 
