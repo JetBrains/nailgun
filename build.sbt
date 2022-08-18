@@ -48,7 +48,7 @@ lazy val `nailgun-server-for-scala-plugin` = project.in(file("nailgun-server"))
     libraryDependencies ++= Seq(
       "net.java.dev.jna" % "jna" % "5.12.1" % Provided,
       "net.java.dev.jna" % "jna-platform" % "5.12.1" % Provided,
-      "org.junit.jupiter" % "junit-jupiter-api" % "5.8.2" % Test,
+      "org.junit.jupiter" % "junit-jupiter-api" % "5.9.0" % Test,
       "org.mockito" % "mockito-junit-jupiter" % "4.5.1" % Test,
       "net.aichler" % "jupiter-interface" % "0.10.0" % Test
     )
