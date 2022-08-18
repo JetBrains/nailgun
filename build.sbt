@@ -35,8 +35,6 @@ ThisBuild / scmInfo := Some(
 
 ThisBuild / sonatypeProjectHosting := Some(GitHubHosting("JetBrains", "nailgun", "scala-developers@jetbrains.com"))
 
-ThisBuild / resolvers += Resolver.jcenterRepo
-
 lazy val nailgun = project.in(file("."))
   .settings(publish / skip := true)
   .aggregate(`nailgun-server-for-scala-plugin`)
