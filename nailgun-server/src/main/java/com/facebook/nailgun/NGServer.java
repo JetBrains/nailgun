@@ -314,8 +314,10 @@ public class NGServer implements Runnable {
 
   /** Listens for new connections and launches NGSession threads to process them. */
   public void run() {
-    originalSecurityManager = System.getSecurityManager();
-    System.setSecurityManager(new NGSecurityManager(originalSecurityManager));
+    if (isSecurityManagerSupported()) {
+      originalSecurityManager = System.getSecurityManager();
+      System.setSecurityManager(new NGSecurityManager(originalSecurityManager));
+    }
 
     if (!(System.in instanceof ThreadLocalInputStream)) {
       System.setIn(new ThreadLocalInputStream(in));
@@ -426,7 +428,10 @@ public class NGServer implements Runnable {
     System.setOut(out);
     System.setErr(err);
 
-    System.setSecurityManager(originalSecurityManager);
+    if (isSecurityManagerSupported()) {
+      System.setSecurityManager(originalSecurityManager);
+      originalSecurityManager = null;
+    }
 
     running.set(false);
   }
@@ -547,5 +552,23 @@ public class NGServer implements Runnable {
         System.out.println("NGServer shut down.");
       }
     }
+  }
+
+  // Adapted from https://stackoverflow.com/a/49512420.
+  private static boolean isSecurityManagerSupported() {
+    String version = System.getProperty("java.version");
+    if (version.startsWith("1.")) {
+      version = version.substring(2);
+    }
+    // Allow these formats:
+    // 1.8.0_72-ea
+    // 9-ea
+    // 9
+    // 9.0.1
+    final int dotPos = version.indexOf('.');
+    final int dashPos = version.indexOf('-');
+    final int majorVersion = Integer.parseInt(version.substring(0, dotPos > -1 ? dotPos : dashPos > -1 ? dashPos : 1));
+    // Security manager was deprecated for removal in Java 17.
+    return majorVersion <= 16;
   }
 }
