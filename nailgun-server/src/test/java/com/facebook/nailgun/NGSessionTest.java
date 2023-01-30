@@ -61,7 +61,7 @@ class NGSessionTest {
   }
 
   @BeforeEach
-  private void startSession() throws IOException {
+  void startSession() throws IOException {
     id = lastId.incrementAndGet();
     signals.put(id, new CountDownLatch(1));
     server = mock(NGServer.class);
@@ -80,7 +80,7 @@ class NGSessionTest {
   }
 
   @AfterEach
-  private void stopSession() throws InterruptedException {
+  void stopSession() throws InterruptedException {
     session.shutdown();
     session.join();
   }

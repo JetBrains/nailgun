@@ -42,7 +42,7 @@ class NGCommunicatorTest {
   private OutputStream ostream;
 
   @BeforeEach
-  private void before() throws IOException {
+  void before() throws IOException {
     socket = mock(Socket.class);
 
     istream = mock(InputStream.class);

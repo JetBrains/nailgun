@@ -48,7 +48,7 @@ class NGServerTest {
   private NGServerContext context = null;
 
   @BeforeEach
-  private void startServer() throws InterruptedException {
+  void startServer() throws InterruptedException {
     NGListeningAddress.release(SOCKET_ADDR);
     NGServer server = new NGServer(new NGListeningAddress(SOCKET_ADDR), 2, 10000);
     Thread t = new Thread(server);
@@ -61,7 +61,7 @@ class NGServerTest {
   }
 
   @AfterEach
-  private void stopServer() throws InterruptedException {
+  void stopServer() throws InterruptedException {
     context.server.shutdown();
     context.thread.join();
     NGListeningAddress.release(SOCKET_ADDR);
