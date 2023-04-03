@@ -47,6 +47,7 @@ lazy val `nailgun-server-for-scala-plugin` = project.in(file("nailgun-server"))
       "net.java.dev.jna" % "jna" % "5.12.1" % Provided,
       "net.java.dev.jna" % "jna-platform" % "5.12.1" % Provided,
       "org.mockito" % "mockito-junit-jupiter" % "4.11.0" % Test,
-      "net.aichler" % "jupiter-interface" % JupiterKeys.jupiterVersion.value % Test
+      "net.aichler" % "jupiter-interface" % JupiterKeys.jupiterVersion.value % Test,
+      "org.junit.jupiter" % "junit-jupiter-params" % JupiterKeys.junitJupiterVersion.value % Test
     )
   )
