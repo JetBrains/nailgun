@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -75,13 +76,13 @@ public class NGServer implements Runnable {
   private final NGSessionPool sessionPool;
 
   /** <code>System.out</code> at the time of the NGServer's creation */
-  public final PrintStream out = System.out;
+  public static final PrintStream out = System.out;
 
   /** <code>System.err</code> at the time of the NGServer's creation */
-  public final PrintStream err = System.err;
+  public static final PrintStream err = System.err;
 
   /** <code>System.in</code> at the time of the NGServer's creation */
-  public final InputStream in = System.in;
+  public static final InputStream in = System.in;
 
   /** a collection of all classes executed by this server so far */
   private final Map<Class<?>, NailStats> allNailStats;
@@ -312,6 +313,9 @@ public class NGServer implements Runnable {
     return (serversocket == null) ? listeningAddress.getInetPort() : serversocket.getLocalPort();
   }
 
+  public static AtomicReference<PrintStream> CurrentOut = new AtomicReference<>(out);
+  public static AtomicReference<PrintStream> CurrentErr = new AtomicReference<>(err);
+
   /** Listens for new connections and launches NGSession threads to process them. */
   public void run() {
     if (isSecurityManagerSupported()) {
@@ -323,10 +327,10 @@ public class NGServer implements Runnable {
       System.setIn(new ThreadLocalInputStream(in));
     }
     if (!(System.out instanceof ThreadLocalPrintStream)) {
-      System.setOut(new ThreadLocalPrintStream(out));
+      System.setOut(new ThreadLocalPrintStream(out, CurrentOut));
     }
     if (!(System.err instanceof ThreadLocalPrintStream)) {
-      System.setErr(new ThreadLocalPrintStream(err));
+      System.setErr(new ThreadLocalPrintStream(err, CurrentErr));
     }
 
     try {
@@ -556,6 +560,7 @@ public class NGServer implements Runnable {
 
   private static boolean isSecurityManagerSupported() {
     // Security manager was deprecated for removal in Java 17.
-    return JavaVersionUtil.featureVersion() <= 16;
+    // Airbnb Fork: Always return true, as the security manager is deprecated but still exists in the runtimes we support.
+    return true; // return JavaVersionUtil.featureVersion() <= 16;
   }
 }

@@ -19,6 +19,7 @@ package com.facebook.nailgun;
 
 import java.io.IOException;
 import java.io.PrintStream;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * The class name is pretty descriptive. This creates a PrintStream much like a FilterOutputStream,
@@ -31,21 +32,49 @@ import java.io.PrintStream;
  */
 public class ThreadLocalPrintStream extends PrintStream {
 
-  /** The PrintStreams for the various threads */
+  // Airbnb Fork: We've implemented new logic below to avoid losing console output in the following scenario:
+  // 1. Nailgun Server starts and has its own stdout PrintStream
+  // 2. Nailgun Client #1 connects and runs a QuickTest which first starts a Dropwizard server.
+  //    Long-lived threads are spawned from the Dropwizard server and these threads use a InheritableThreadLocal that writes to Client #1's stdout.
+  //    The QuickTest case then makes a request and asserts the response and all resulting output goes to Client #1's stdout.
+  // 3. Client #1 disconnects
+  // 4. Nailgun Client 2 connects runs the same test as Client #1.
+  //    The Dropwizard server is already started, so nothing is done
+  //    The QuickTest case then makes a request and asserts the response and all resulting output:
+  //    a) Would normally have been dropped by nailgun, as the InheritableThreadLocal is referring to Client #1's stdout which is now closed.
+  //    b) The Airbnb fork, instead sends the output to clientConnectedPrintStreamRef, which was set when Client #2 connected.
+  // 5. Client #2 disconnects
+  // 6. A log is emitted by the Dropwizard server
+  //    a) Would normally have been dropped by Nailgun, as the InheritableThreadLocal is referring to Client #1's stdout which is the client
+  //       that was connected when the Dropwizard server started.
+  //    b) The Airbnb fork, instead sends the output to originalPrintStream, which is the original PrintStream used by the Nailgun server.
+
+  /** The PrintStreams for the various threads (created by threads spawned from client connections) */
   private InheritableThreadLocal streams = null;
 
-  private PrintStream defaultPrintStream = null;
+  /**
+   * Airbnb Fork: A ref to the PrintStream associated with the most recently connected client.
+   * This is our first fallback when we can't use the InheritableThreadLocal.
+   */
+  private AtomicReference<PrintStream> clientConnectedPrintStreamRef = null;
+
+  /*
+   * The original PrintStream used by the Nailgun server. This is the second fallback
+   * This is our second fallback when we can't use the InheritableThreadLocal.
+   */
+  private final PrintStream originalPrintStream;
 
   /**
    * Creates a new InheritedThreadLocalPrintStream
    *
-   * @param defaultPrintStream the PrintStream that will be used if the current thread has not
+   * @param clientConnectedPrintStreamRef the PrintStream that will be used if the current thread has not
    *     called init()
    */
-  public ThreadLocalPrintStream(PrintStream defaultPrintStream) {
-    super(defaultPrintStream);
+  public ThreadLocalPrintStream(PrintStream originalPrintStream, AtomicReference<PrintStream> clientConnectedPrintStreamRef) {
+    super(originalPrintStream);
     streams = new InheritableThreadLocal();
-    this.defaultPrintStream = defaultPrintStream;
+    this.originalPrintStream = originalPrintStream;
+    this.clientConnectedPrintStreamRef = clientConnectedPrintStreamRef;
     init(null);
   }
 
@@ -65,7 +94,21 @@ public class ThreadLocalPrintStream extends PrintStream {
    */
   PrintStream getPrintStream() {
     PrintStream result = (PrintStream) streams.get();
-    return ((result == null) ? defaultPrintStream : result);
+    if (result == null || result instanceof ThreadLocalPrintStream || isError(result)) {
+      PrintStream clientConnectedPrintStream = clientConnectedPrintStreamRef.get();
+      if (clientConnectedPrintStream == null || clientConnectedPrintStream.checkError()) {
+        return originalPrintStream;
+      } else {
+        return clientConnectedPrintStream;
+      }
+    } else {
+      return result;
+    }
+  }
+
+  private boolean isError(PrintStream printStream) {
+    printStream.flush(); // We flush first so checkError can detect a closing/closed stream...
+    return printStream.checkError();
   }
 
   //  BEGIN delegated java.io.PrintStream methods

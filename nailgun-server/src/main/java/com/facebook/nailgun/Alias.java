@@ -25,6 +25,7 @@ package com.facebook.nailgun;
  *
  * @author <a href="http://www.martiansoftware.com/contact.html">Marty Lamb</a>
  */
+@java.lang.SuppressWarnings("ComparableType")
 public class Alias implements Comparable {
 
   /** The alias name */
