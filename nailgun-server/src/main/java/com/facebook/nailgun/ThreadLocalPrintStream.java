@@ -19,6 +19,7 @@ package com.facebook.nailgun;
 
 import java.io.IOException;
 import java.io.PrintStream;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * The class name is pretty descriptive. This creates a PrintStream much like a FilterOutputStream,
@@ -31,21 +32,32 @@ import java.io.PrintStream;
  */
 public class ThreadLocalPrintStream extends PrintStream {
 
-  /** The PrintStreams for the various threads */
+  /** The PrintStreams for the various threads (created by threads spawned from client connections) */
   private InheritableThreadLocal streams = null;
 
-  private PrintStream defaultPrintStream = null;
+  /**
+   * A ref to the PrintStream associated with the most recently connected client.
+   * This is our first fallback when we can't use the InheritableThreadLocal.
+   */
+  private AtomicReference<PrintStream> clientConnectedPrintStreamRef = null;
+
+  /*
+   * The original PrintStream used by the Nailgun server.
+   * This is our second fallback when we can't use the InheritableThreadLocal.
+   */
+  private final PrintStream originalPrintStream;
 
   /**
    * Creates a new InheritedThreadLocalPrintStream
    *
-   * @param defaultPrintStream the PrintStream that will be used if the current thread has not
+   * @param clientConnectedPrintStreamRef the PrintStream that will be used if the current thread has not
    *     called init()
    */
-  public ThreadLocalPrintStream(PrintStream defaultPrintStream) {
-    super(defaultPrintStream);
+  public ThreadLocalPrintStream(PrintStream originalPrintStream, AtomicReference<PrintStream> clientConnectedPrintStreamRef) {
+    super(originalPrintStream);
     streams = new InheritableThreadLocal();
-    this.defaultPrintStream = defaultPrintStream;
+    this.originalPrintStream = originalPrintStream;
+    this.clientConnectedPrintStreamRef = clientConnectedPrintStreamRef;
     init(null);
   }
 
@@ -65,7 +77,21 @@ public class ThreadLocalPrintStream extends PrintStream {
    */
   PrintStream getPrintStream() {
     PrintStream result = (PrintStream) streams.get();
-    return ((result == null) ? defaultPrintStream : result);
+    if (result == null || result instanceof ThreadLocalPrintStream || isError(result)) {
+      PrintStream clientConnectedPrintStream = clientConnectedPrintStreamRef.get();
+      if (clientConnectedPrintStream == null || clientConnectedPrintStream.checkError()) {
+        return originalPrintStream;
+      } else {
+        return clientConnectedPrintStream;
+      }
+    } else {
+      return result;
+    }
+  }
+
+  private boolean isError(PrintStream printStream) {
+    printStream.flush(); // We flush first so checkError can detect a closing/closed stream...
+    return printStream.checkError();
   }
 
   //  BEGIN delegated java.io.PrintStream methods

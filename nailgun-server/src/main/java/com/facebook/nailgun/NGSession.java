@@ -37,6 +37,9 @@ import java.util.logging.Logger;
  */
 public class NGSession extends Thread {
 
+  private static PrintStream CurrentConnectedPrintStreamOut;
+  private static PrintStream CurrentConnectedPrintStreamErr;
+
   @FunctionalInterface
   public interface CommnunicatorCreator {
     NGCommunicator get(Socket socket) throws IOException;
@@ -203,9 +206,11 @@ public class NGSession extends Thread {
       LOG.log(Level.FINEST, "NGSession {0} started cleanup", instanceNumber);
 
       if (System.in instanceof ThreadLocalInputStream) {
-        ((ThreadLocalInputStream) System.in).init(null);
-        ((ThreadLocalPrintStream) System.out).init(null);
-        ((ThreadLocalPrintStream) System.err).init(null);
+        ((ThreadLocalInputStream) System.in).init(NGServer.in);
+        NGServer.CurrentOut.set(NGServer.out);
+        NGServer.CurrentErr.set(NGServer.err);
+        ((ThreadLocalPrintStream) System.out).init(NGServer.out);
+        ((ThreadLocalPrintStream) System.err).init(NGServer.err);
       }
 
       LOG.log(Level.FINE, "NGSession {0} is closing client socket", instanceNumber);
@@ -228,6 +233,10 @@ public class NGSession extends Thread {
         PrintStream out = new PrintStream(new NGOutputStream(comm, NGConstants.CHUNKTYPE_STDOUT));
         PrintStream err =
             new PrintStream(new NGOutputStream(comm, NGConstants.CHUNKTYPE_STDERR)); ) {
+
+      NGServer.CurrentOut.set(out);
+      NGServer.CurrentErr.set(err);
+
       // ThreadLocal streams for System.in/out/err redirection
       if (System.in instanceof ThreadLocalInputStream) {
         ((ThreadLocalInputStream) System.in).init(in);

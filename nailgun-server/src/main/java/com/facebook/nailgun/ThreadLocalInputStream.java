@@ -29,7 +29,7 @@ import java.io.InputStream;
  *
  * @author <a href="http://www.martiansoftware.com/contact.html">Marty Lamb</a>
  */
-class ThreadLocalInputStream extends InputStream {
+public class ThreadLocalInputStream extends InputStream {
 
   /** The InputStreams for the various threads */
   private InheritableThreadLocal streams = null;
@@ -40,7 +40,7 @@ class ThreadLocalInputStream extends InputStream {
    * @param defaultInputStream the InputStream that will be used if the current thread has not
    *     called init()
    */
-  ThreadLocalInputStream(InputStream defaultInputStream) {
+  public ThreadLocalInputStream(InputStream defaultInputStream) {
     super();
     streams = new InheritableThreadLocal();
     this.defaultInputStream = defaultInputStream;
