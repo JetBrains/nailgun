@@ -32,34 +32,17 @@ import java.util.concurrent.atomic.AtomicReference;
  */
 public class ThreadLocalPrintStream extends PrintStream {
 
-  // Airbnb Fork: We've implemented new logic below to avoid losing console output in the following scenario:
-  // 1. Nailgun Server starts and has its own stdout PrintStream
-  // 2. Nailgun Client #1 connects and runs a QuickTest which first starts a Dropwizard server.
-  //    Long-lived threads are spawned from the Dropwizard server and these threads use a InheritableThreadLocal that writes to Client #1's stdout.
-  //    The QuickTest case then makes a request and asserts the response and all resulting output goes to Client #1's stdout.
-  // 3. Client #1 disconnects
-  // 4. Nailgun Client 2 connects runs the same test as Client #1.
-  //    The Dropwizard server is already started, so nothing is done
-  //    The QuickTest case then makes a request and asserts the response and all resulting output:
-  //    a) Would normally have been dropped by nailgun, as the InheritableThreadLocal is referring to Client #1's stdout which is now closed.
-  //    b) The Airbnb fork, instead sends the output to clientConnectedPrintStreamRef, which was set when Client #2 connected.
-  // 5. Client #2 disconnects
-  // 6. A log is emitted by the Dropwizard server
-  //    a) Would normally have been dropped by Nailgun, as the InheritableThreadLocal is referring to Client #1's stdout which is the client
-  //       that was connected when the Dropwizard server started.
-  //    b) The Airbnb fork, instead sends the output to originalPrintStream, which is the original PrintStream used by the Nailgun server.
-
   /** The PrintStreams for the various threads (created by threads spawned from client connections) */
   private InheritableThreadLocal streams = null;
 
   /**
-   * Airbnb Fork: A ref to the PrintStream associated with the most recently connected client.
+   * A ref to the PrintStream associated with the most recently connected client.
    * This is our first fallback when we can't use the InheritableThreadLocal.
    */
   private AtomicReference<PrintStream> clientConnectedPrintStreamRef = null;
 
   /*
-   * The original PrintStream used by the Nailgun server. This is the second fallback
+   * The original PrintStream used by the Nailgun server.
    * This is our second fallback when we can't use the InheritableThreadLocal.
    */
   private final PrintStream originalPrintStream;

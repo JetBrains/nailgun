@@ -559,8 +559,6 @@ public class NGServer implements Runnable {
   }
 
   private static boolean isSecurityManagerSupported() {
-    // Security manager was deprecated for removal in Java 17.
-    // Airbnb Fork: Always return true, as the security manager is deprecated but still exists in the runtimes we support.
-    return true; // return JavaVersionUtil.featureVersion() <= 16;
+    return JavaVersionUtil.featureVersion() <= 16;
   }
 }
